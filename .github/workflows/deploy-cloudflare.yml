@@ -4,6 +4,10 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  # Fired by the Nexus sync after a layout is submitted, so the studio rebuilds with the new schema:
+  # POST /repos/kishore2217/nexus-sanity/dispatches {"event_type": "sanity-layout-schema"}
+  repository_dispatch:
+    types: [sanity-layout-schema]
 
 concurrency:
   group: cloudflare-pages-deploy
