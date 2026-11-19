@@ -1,0 +1,42 @@
+name: Deploy Studio to Cloudflare Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: cloudflare-pages-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # `npm run build` triggers `prebuild`, which runs scripts/generate-layout-schemas.ts.
+      # That script only reads from Sanity, so a read token is enough; `sanity exec
+      # --with-user-token` picks it up from SANITY_AUTH_TOKEN.
+      - name: Build studio
+        run: npm run build
+        env:
+          SANITY_AUTH_TOKEN: ${{ secrets.SANITY_API_READ_TOKEN }}
+
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=nexus-sanity --branch=main
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
