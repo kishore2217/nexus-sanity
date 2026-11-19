@@ -28,10 +28,10 @@ export default defineConfig({
 
   document: {
     newDocumentOptions: (options) => options.filter((o) => !layoutTypeNames.has(o.templateId)),
-    // Deleting or duplicating a layout document here would desync it from its Nexus layout.
+    // Duplicating a layout document here would create a copy Nexus doesn't know about.
     actions: (actions, { schemaType }) =>
       layoutTypeNames.has(schemaType)
-        ? actions.filter(({ action }) => action !== "delete" && action !== "duplicate")
+        ? actions.filter(({ action }) => action !== "duplicate")
         : actions,
   },
 });
