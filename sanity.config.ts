@@ -1,5 +1,5 @@
 import { visionTool } from "@sanity/vision";
-import { defineConfig } from "sanity";
+import { defineConfig, type DocumentActionComponent } from "sanity";
 import { structureTool } from "sanity/structure";
 import { layoutTypeNames, schemaTypes } from "./schemaTypes";
 
@@ -31,7 +31,20 @@ export default defineConfig({
     // Duplicating a layout document here would create a copy Nexus doesn't know about.
     actions: (actions, { schemaType }) =>
       layoutTypeNames.has(schemaType)
-        ? actions.filter(({ action }) => action !== "duplicate")
+        ? actions
+            .filter(({ action }) => action !== "duplicate")
+            .map((Action) => (Action.action === "delete" ? alsoInHeaderMenu(Action) : Action))
         : actions,
   },
 });
+
+/** Shows an action in the document header's "⋯" menu as well as the footer menu by Publish. */
+function alsoInHeaderMenu(Action: DocumentActionComponent): DocumentActionComponent {
+  const Wrapped: DocumentActionComponent = (props) => {
+    const description = Action(props);
+    return description && { ...description, group: ["default", "paneActions"] };
+  };
+  Wrapped.action = Action.action;
+  Wrapped.displayName = Action.displayName;
+  return Wrapped;
+}
