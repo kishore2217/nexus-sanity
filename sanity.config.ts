@@ -1,7 +1,7 @@
 import { visionTool } from "@sanity/vision";
 import { defineConfig, type DocumentActionComponent } from "sanity";
 import { structureTool } from "sanity/structure";
-import { layoutTypeNames, schemaTypes } from "./schemaTypes";
+import { layoutTypeNames, nexusTypeNames, pageTypeNames, schemaTypes } from "./schemaTypes";
 
 export default defineConfig({
   name: "default",
@@ -14,23 +14,38 @@ export default defineConfig({
     structureTool({
       structure: (S) =>
         S.list()
-          .title("Layouts")
-          .items([...layoutTypeNames].map((name) => S.documentTypeListItem(name))),
+          .title("Content")
+          .items([
+            S.listItem()
+              .title("Pages")
+              .child(
+                S.list()
+                  .title("Pages")
+                  .items([...pageTypeNames].map((name) => S.documentTypeListItem(name))),
+              ),
+            S.listItem()
+              .title("Layouts")
+              .child(
+                S.list()
+                  .title("Layouts")
+                  .items([...layoutTypeNames].map((name) => S.documentTypeListItem(name))),
+              ),
+          ]),
     }),
     visionTool(),
   ],
 
   schema: {
     types: schemaTypes,
-    // Layout documents come from the Nexus studio: editors fill them, never create them.
-    templates: (templates) => templates.filter((t) => !layoutTypeNames.has(t.schemaType)),
+    // Layout and page documents come from the Nexus studio: editors fill them, never create them.
+    templates: (templates) => templates.filter((t) => !nexusTypeNames.has(t.schemaType)),
   },
 
   document: {
-    newDocumentOptions: (options) => options.filter((o) => !layoutTypeNames.has(o.templateId)),
-    // Duplicating a layout document here would create a copy Nexus doesn't know about.
+    newDocumentOptions: (options) => options.filter((o) => !nexusTypeNames.has(o.templateId)),
+    // Duplicating a layout or page document here would create a copy Nexus doesn't know about.
     actions: (actions, { schemaType }) =>
-      layoutTypeNames.has(schemaType)
+      nexusTypeNames.has(schemaType)
         ? actions
             .filter(({ action }) => action !== "duplicate")
             .map((Action) => (Action.action === "delete" ? alsoInHeaderMenu(Action) : Action))
