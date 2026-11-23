@@ -1,5 +1,7 @@
 import type { SchemaTypeDefinition } from "sanity";
-import { layoutTypes, pageSubtitles, pageTypes } from "./layouts.generated";
+import { docTypes, layoutTypes, pageSubtitles, pageTypes } from "./layouts.generated";
+
+export { docTypes };
 
 /** Page types list as "<page>" with "<layout> (vN) · <widgets>" under it. */
 const pageTypesWithPreview = pageTypes.map(

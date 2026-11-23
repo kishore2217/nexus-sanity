@@ -1,7 +1,13 @@
 import { visionTool } from "@sanity/vision";
 import { defineConfig, type DocumentActionComponent } from "sanity";
 import { structureTool, type StructureBuilder } from "sanity/structure";
-import { layoutTypeNames, nexusTypeNames, pageTypeNames, schemaTypes } from "./schemaTypes";
+import {
+  docTypes,
+  layoutTypeNames,
+  nexusTypeNames,
+  pageTypeNames,
+  schemaTypes,
+} from "./schemaTypes";
 
 export default defineConfig({
   name: "default",
@@ -59,6 +65,9 @@ function nexusDocumentList(S: StructureBuilder, id: string, title: string, types
     .initialValueTemplates([])
     .menuItems([])
     .child(async (id) => {
+      // Known at build time: open the document without a round trip to Sanity.
+      const known = docTypes[id];
+      if (known) return S.document().id("editor").schemaType(known).documentId(id);
       const client = S.context.getClient({ apiVersion: "2025-02-19" });
       // Older URLs (and links built from them) put the type name where the document id goes:
       // /structure/pages/page_blog_da4e69. Each type holds one document, so open that one.
@@ -68,7 +77,8 @@ function nexusDocumentList(S: StructureBuilder, id: string, title: string, types
           ? S.document().id("editor").schemaType(id).documentId(docId.replace(/^drafts\./, ""))
           : S.documentTypeList(id);
       }
-      // With several types in one list, the editor needs the document's type up front.
+      // Synced after this build: look its type up. With several types in one list, the editor
+      // needs the document's type up front.
       const type = await client.fetch<string | null>(
         `*[_id in [$id, "drafts." + $id]][0]._type`,
         { id },

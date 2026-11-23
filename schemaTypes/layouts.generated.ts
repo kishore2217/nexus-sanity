@@ -549,7 +549,7 @@ export const pageTypes = [
       },
       {
         "name": "newPageLayout1",
-        "title": "New page layout1 (v2)",
+        "title": "New page layout1 (v3)",
         "type": "object",
         "options": {
           "collapsible": true,
@@ -559,95 +559,6 @@ export const pageTypes = [
           {
             "name": "allType",
             "title": "All Type",
-            "type": "object",
-            "options": {
-              "collapsible": true,
-              "collapsed": false
-            },
-            "fields": [
-              {
-                "name": "title",
-                "title": "Title",
-                "type": "string"
-              },
-              {
-                "name": "price",
-                "title": "Price",
-                "type": "number"
-              },
-              {
-                "name": "description",
-                "title": "Description",
-                "type": "text"
-              },
-              {
-                "name": "category",
-                "title": "Category",
-                "type": "string",
-                "options": {
-                  "list": [
-                    {
-                      "title": "Electronics",
-                      "value": "electronics"
-                    },
-                    {
-                      "title": "Fashion",
-                      "value": "fashion"
-                    },
-                    {
-                      "title": "Home",
-                      "value": "home"
-                    }
-                  ]
-                }
-              },
-              {
-                "name": "status",
-                "title": "Status",
-                "type": "string",
-                "options": {
-                  "list": [
-                    {
-                      "title": "Active",
-                      "value": "active"
-                    },
-                    {
-                      "title": "Inactive",
-                      "value": "inactive"
-                    }
-                  ]
-                }
-              },
-              {
-                "name": "featured",
-                "title": "Featured Product",
-                "type": "boolean"
-              },
-              {
-                "name": "published",
-                "title": "Published",
-                "type": "boolean"
-              },
-              {
-                "name": "publishDate",
-                "title": "Publish Date",
-                "type": "date"
-              },
-              {
-                "name": "website",
-                "title": "Website",
-                "type": "url"
-              },
-              {
-                "name": "image",
-                "title": "Product Image",
-                "type": "image"
-              }
-            ]
-          },
-          {
-            "name": "allType2",
-            "title": "All Type 2",
             "type": "object",
             "options": {
               "collapsible": true,
@@ -952,6 +863,15 @@ export const pageTypes = [
 export const pageSubtitles: Record<string, string> = {
   "page_blog_da4e69": "New page layout1 (v2) · All Type, All Type 2",
   "page_link_7367ed": "New page layout1 (v2) · All Type, All Type 2",
-  "page_homea_34db54": "New page layout1 (v2) · All Type, All Type 2",
+  "page_homea_34db54": "New page layout1 (v3) · All Type",
   "page_services_246876": "New page layout1 (v2) · All Type, All Type 2"
+}
+
+/** Content document id → its type: the desk opens documents without a type lookup. */
+export const docTypes: Record<string, string> = {
+  "nexusLayout-b886d26e-8388-4d1f-a56d-58c667603063": "layout_new_page_layout1_b886d2",
+  "nexusPage-da4e6908-1909-409c-ac0b-58e70b154c25": "page_blog_da4e69",
+  "nexusPage-7367ed48-ca8d-4b23-8451-94c0bd13e732": "page_link_7367ed",
+  "nexusPage-34db5492-fa87-4987-9b2f-d836639eae9d": "page_homea_34db54",
+  "nexusPage-24687612-e0ad-4644-abc6-cb3dc60e9d79": "page_services_246876"
 }
