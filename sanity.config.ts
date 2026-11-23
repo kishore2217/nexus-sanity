@@ -57,7 +57,25 @@ function nexusDocumentList(S: StructureBuilder, id: string, title: string, types
     .params({ types: [...types] })
     .defaultOrdering([{ field: "title", direction: "asc" }])
     .initialValueTemplates([])
-    .menuItems([]);
+    .menuItems([])
+    .child(async (id) => {
+      const client = S.context.getClient({ apiVersion: "2025-02-19" });
+      // Older URLs (and links built from them) put the type name where the document id goes:
+      // /structure/pages/page_blog_da4e69. Each type holds one document, so open that one.
+      if (types.has(id)) {
+        const docId = await client.fetch<string | null>(`*[_type == $type][0]._id`, { type: id });
+        return docId
+          ? S.document().id("editor").schemaType(id).documentId(docId.replace(/^drafts\./, ""))
+          : S.documentTypeList(id);
+      }
+      // With several types in one list, the editor needs the document's type up front.
+      const type = await client.fetch<string | null>(
+        `*[_id in [$id, "drafts." + $id]][0]._type`,
+        { id },
+      );
+      if (!type) throw new Error(`Document "${id}" not found. It may have been deleted in Nexus.`);
+      return S.document().id("editor").schemaType(type).documentId(id);
+    });
 }
 
 /** Shows an action in the document header's "⋯" menu as well as the footer menu by Publish. */
