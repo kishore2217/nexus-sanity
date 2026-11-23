@@ -18,10 +18,18 @@ export default defineConfig({
           .items([
             S.listItem()
               .title("Pages")
+              // Each page type holds one document (a page has one layout), so list the documents
+              // themselves: one pane with a search bar, and a click opens the page directly.
               .child(
-                S.list()
+                S.documentList()
+                  .id("pages")
                   .title("Pages")
-                  .items([...pageTypeNames].map((name) => S.documentTypeListItem(name))),
+                  .apiVersion("2025-02-19")
+                  .filter("_type in $types")
+                  .params({ types: [...pageTypeNames] })
+                  .defaultOrdering([{ field: "title", direction: "asc" }])
+                  .initialValueTemplates([])
+                  .menuItems([]),
               ),
             S.listItem()
               .title("Layouts")
