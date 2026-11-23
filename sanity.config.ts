@@ -1,6 +1,6 @@
 import { visionTool } from "@sanity/vision";
 import { defineConfig, type DocumentActionComponent } from "sanity";
-import { structureTool } from "sanity/structure";
+import { structureTool, type StructureBuilder } from "sanity/structure";
 import { layoutTypeNames, nexusTypeNames, pageTypeNames, schemaTypes } from "./schemaTypes";
 
 export default defineConfig({
@@ -16,36 +16,10 @@ export default defineConfig({
         S.list()
           .title("Content")
           .items([
-            S.listItem()
-              .title("Pages")
-              // Each page type holds one document (a page has one layout), so list the documents
-              // themselves: one pane with a search bar, and a click opens the page directly.
-              .child(
-                S.documentList()
-                  .id("pages")
-                  .title("Pages")
-                  .apiVersion("2025-02-19")
-                  .filter("_type in $types")
-                  .params({ types: [...pageTypeNames] })
-                  .defaultOrdering([{ field: "title", direction: "asc" }])
-                  .initialValueTemplates([])
-                  .menuItems([]),
-              ),
+            S.listItem().title("Pages").child(nexusDocumentList(S, "pages", "Pages", pageTypeNames)),
             S.listItem()
               .title("Layouts")
-              // Each layout type holds one document, so list the documents themselves: one pane
-              // with a search bar, and a click opens the layout's document directly.
-              .child(
-                S.documentList()
-                  .id("layouts")
-                  .title("Layouts")
-                  .apiVersion("2025-02-19")
-                  .filter("_type in $types")
-                  .params({ types: [...layoutTypeNames] })
-                  .defaultOrdering([{ field: "title", direction: "asc" }])
-                  .initialValueTemplates([])
-                  .menuItems([]),
-              ),
+              .child(nexusDocumentList(S, "layouts", "Layouts", layoutTypeNames)),
           ]),
     }),
     visionTool(),
@@ -68,6 +42,23 @@ export default defineConfig({
         : actions,
   },
 });
+
+/**
+ * One pane listing every document of the given Nexus types. Each type holds a single document
+ * (a page has one layout), so listing documents instead of types gives a search bar and opens the
+ * document in one click. No create button: Nexus creates these documents.
+ */
+function nexusDocumentList(S: StructureBuilder, id: string, title: string, types: Set<string>) {
+  return S.documentList()
+    .id(id)
+    .title(title)
+    .apiVersion("2025-02-19")
+    .filter("_type in $types")
+    .params({ types: [...types] })
+    .defaultOrdering([{ field: "title", direction: "asc" }])
+    .initialValueTemplates([])
+    .menuItems([]);
+}
 
 /** Shows an action in the document header's "⋯" menu as well as the footer menu by Publish. */
 function alsoInHeaderMenu(Action: DocumentActionComponent): DocumentActionComponent {

@@ -10,6 +10,7 @@
     "prebuild": "npm run generate",
     "predeploy": "npm run generate",
     "build": "sanity build",
+    "postbuild": "node scripts/write-cloudflare-headers.mjs",
     "deploy": "sanity deploy",
     "deploy-graphql": "sanity graphql deploy",
     "dev": "sanity dev",

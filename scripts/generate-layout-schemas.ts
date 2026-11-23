@@ -13,7 +13,7 @@
  * Runs before `dev`, `build` and `deploy` (see package.json), as the signed-in Sanity user:
  *   sanity exec scripts/generate-layout-schemas.ts --with-user-token
  */
-import { writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { getCliClient } from "sanity/cli";
 
@@ -37,6 +37,40 @@ type StoredPage = { typeName: string; title?: string; layouts?: StoredPageLayout
 const OUTPUT = resolve(process.cwd(), "schemaTypes/layouts.generated.ts");
 const JSON_ROWS = 6;
 
+/** Field types the generator can emit as-is. Anything else would break the whole Studio schema. */
+const SUPPORTED_FIELD_TYPES = new Set([
+  "string", "text", "number", "boolean", "date", "datetime", "url", "image", "file", "slug",
+]);
+/** Sanity type and field names: a letter or underscore, then letters, digits or underscores. */
+const VALID_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/**
+ * Keeps items with a valid, unique name and warns about the rest. One bad or duplicate name in
+ * Sanity data would otherwise stop the Studio from loading for everyone.
+ */
+function validNamed<T>(items: T[] | undefined, nameOf: (item: T) => unknown, where: string): T[] {
+  const seen = new Set<string>();
+  return (items ?? []).filter((item) => {
+    const name = nameOf(item);
+    if (typeof name !== "string" || !VALID_NAME.test(name)) {
+      console.warn(`Skipping ${where}: invalid name ${JSON.stringify(name)}`);
+      return false;
+    }
+    if (seen.has(name)) {
+      console.warn(`Skipping ${where}: duplicate name "${name}"`);
+      return false;
+    }
+    seen.add(name);
+    return true;
+  });
+}
+
+/** "New page layout1 (v2)": a page layout's title with its version. */
+function layoutLabel(layout: StoredPageLayout): string {
+  const title = layout.title ?? layout.fieldName;
+  return layout.versionNumber ? `${title} (v${layout.versionNumber})` : title;
+}
+
 const QUERY = `{
   "layouts": *[_type == "nexusLayoutType" && !(_id in path("drafts.**"))]
     | order(title asc){typeName, title, widgets},
@@ -54,17 +88,28 @@ function toField(field: StoredField) {
   };
 }
 
+/** Fields Sanity can render: a valid, unique name and a supported type. */
+function toFields(fields: StoredField[] | undefined, where: string) {
+  return validNamed(fields, (f) => f.name, `field in ${where}`)
+    .filter((field) => {
+      if (SUPPORTED_FIELD_TYPES.has(field.type)) return true;
+      console.warn(`Skipping field "${field.name}" in ${where}: unsupported type "${field.type}"`);
+      return false;
+    })
+    .map(toField);
+}
+
 /** One object field per widget. An object needs a field: widgets without props are skipped. */
-function toWidgetFields(widgets: StoredWidget[] | undefined) {
-  return (widgets ?? [])
-    .filter((w) => (w.fields ?? []).length > 0)
+function toWidgetFields(widgets: StoredWidget[] | undefined, where: string) {
+  return validNamed(widgets, (w) => w.fieldName, `widget in ${where}`)
     .map((widget) => ({
       name: widget.fieldName,
       title: widget.title ?? widget.fieldName,
       type: "object",
       options: { collapsible: true, collapsed: false },
-      fields: (widget.fields ?? []).map(toField),
-    }));
+      fields: toFields(widget.fields, `${where} › ${widget.fieldName}`),
+    }))
+    .filter((widget) => widget.fields.length > 0);
 }
 
 function toDocumentType(layout: StoredLayout) {
@@ -75,16 +120,18 @@ function toDocumentType(layout: StoredLayout) {
     fields: [
       { name: "title", title: "Title", type: "string", readOnly: true },
       { name: "slug", title: "Layout id", type: "slug", readOnly: true, hidden: true },
-      ...toWidgetFields(layout.widgets),
+      ...toWidgetFields(layout.widgets, layout.typeName),
     ],
   };
 }
 
 /** Page → one object field per layout → one object field per widget. */
 function toPageDocumentType(page: StoredPage) {
-  const layouts = (page.layouts ?? [])
-    .filter((layout) => layout.fieldName)
-    .map((layout) => ({ layout, widgets: toWidgetFields(layout.widgets) }))
+  const layouts = validNamed(page.layouts, (l) => l.fieldName, `layout in ${page.typeName}`)
+    .map((layout) => ({
+      layout,
+      widgets: toWidgetFields(layout.widgets, `${page.typeName} › ${layout.fieldName}`),
+    }))
     .filter(({ widgets }) => widgets.length > 0);
   return {
     name: page.typeName,
@@ -95,9 +142,7 @@ function toPageDocumentType(page: StoredPage) {
       { name: "slug", title: "Page URL", type: "slug", readOnly: true },
       ...layouts.map(({ layout, widgets }) => ({
         name: layout.fieldName,
-        title: [layout.title ?? layout.fieldName, layout.versionNumber && `(v${layout.versionNumber})`]
-          .filter(Boolean)
-          .join(" "),
+        title: layoutLabel(layout),
         type: "object",
         options: { collapsible: true, collapsed: false },
         fields: widgets,
@@ -110,9 +155,7 @@ function toPageDocumentType(page: StoredPage) {
 function toPageSubtitle(page: StoredPage): string {
   return (page.layouts ?? [])
     .map((layout) => {
-      const name = [layout.title ?? layout.fieldName, layout.versionNumber && `(v${layout.versionNumber})`]
-        .filter(Boolean)
-        .join(" ");
+      const name = layoutLabel(layout);
       const widgets = (layout.widgets ?? []).map((w) => w.title ?? w.fieldName).join(", ");
       return widgets ? `${name} · ${widgets}` : name;
     })
@@ -122,8 +165,15 @@ function toPageSubtitle(page: StoredPage): string {
 async function main() {
   const client = getCliClient({ apiVersion: "2025-02-19" });
   const result = await client.fetch<{ layouts: StoredLayout[]; pages: StoredPage[] }>(QUERY);
-  const layoutTypes = (result.layouts ?? []).filter((l) => l.typeName).map(toDocumentType);
-  const pages = (result.pages ?? []).filter((p) => p.typeName);
+  const layouts = validNamed(result.layouts, (l) => l.typeName, "layout type");
+  // Layout and page types share one schema namespace, so a page can't reuse a layout's name.
+  const layoutNames = new Set(layouts.map((l) => l.typeName));
+  const pages = validNamed(result.pages, (p) => p.typeName, "page type").filter((page) => {
+    if (!layoutNames.has(page.typeName)) return true;
+    console.warn(`Skipping page type: name "${page.typeName}" is already a layout type`);
+    return false;
+  });
+  const layoutTypes = layouts.map(toDocumentType);
   const pageTypes = pages.map(toPageDocumentType);
   const pageSubtitles = Object.fromEntries(pages.map((p) => [p.typeName, toPageSubtitle(p)]));
 
@@ -139,7 +189,8 @@ async function main() {
     `export const pageSubtitles: Record<string, string> = ${JSON.stringify(pageSubtitles, null, 2)}`,
     "",
   ].join("\n");
-  writeFileSync(OUTPUT, source);
+  // Unchanged output: skip the write so `sanity dev` doesn't hot-reload for nothing.
+  if (!existsSync(OUTPUT) || readFileSync(OUTPUT, "utf8") !== source) writeFileSync(OUTPUT, source);
   const names = (types: { name: string }[]) => types.map((t) => t.name).join(", ");
   console.log(`Generated ${layoutTypes.length} layout type(s): ${names(layoutTypes)}`);
   console.log(`Generated ${pageTypes.length} page type(s): ${names(pageTypes)}`);

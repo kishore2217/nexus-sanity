@@ -3,6 +3,8 @@ name: Deploy Studio to Cloudflare Pages
 on:
   push:
     branches: [main]
+    # Docs-only changes don't change the studio.
+    paths-ignore: ["**.md"]
   workflow_dispatch:
   # Fired by the Nexus sync after a layout is submitted, so the studio rebuilds with the new schema:
   # POST /repos/kishore2217/nexus-sanity/dispatches {"event_type": "sanity-layout-schema"}
@@ -16,6 +18,8 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # A normal run takes a couple of minutes; don't let a hung install or deploy burn hours.
+    timeout-minutes: 15
     permissions:
       contents: read
       deployments: write
@@ -27,7 +31,7 @@ jobs:
           node-version: 22
           cache: npm
 
-      - run: npm ci
+      - run: npm ci --no-audit --no-fund
 
       # `npm run build` triggers `prebuild`, which runs scripts/generate-layout-schemas.ts.
       # That script only reads from Sanity, so a read token is enough; `sanity exec
