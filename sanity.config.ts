@@ -1,6 +1,6 @@
 import { visionTool } from "@sanity/vision";
 import { defineConfig, type DocumentActionComponent } from "sanity";
-import { structureTool } from "sanity/structure";
+import { structureTool, type StructureBuilder } from "sanity/structure";
 import { layoutTypeNames, nexusTypeNames, pageTypeNames, schemaTypes } from "./schemaTypes";
 
 export default defineConfig({
@@ -28,7 +28,7 @@ export default defineConfig({
               .child(
                 S.list()
                   .title("Layouts")
-                  .items([...layoutTypeNames].map((name) => S.documentTypeListItem(name))),
+                  .items([...layoutTypeNames].map((name) => singleDocumentItem(S, name))),
               ),
           ]),
     }),
@@ -52,6 +52,28 @@ export default defineConfig({
         : actions,
   },
 });
+
+/**
+ * A Nexus layout type holds exactly one document, so its list item opens that document directly
+ * instead of a one-row document list. Falls back to the list if the document doesn't exist yet.
+ */
+function singleDocumentItem(S: StructureBuilder, typeName: string) {
+  return S.listItem()
+    .id(typeName)
+    .title(S.context.schema.get(typeName)?.title ?? typeName)
+    .schemaType(typeName)
+    .child(async () => {
+      const client = S.context.getClient({ apiVersion: "2025-02-19" });
+      const id = await client.fetch<string | null>(
+        `*[_type == $type] | order(_updatedAt desc)[0]._id`,
+        { type: typeName },
+        { perspective: "raw" },
+      );
+      if (!id) return S.documentTypeList(typeName);
+      const publishedId = id.replace(/^(drafts\.|versions\.[^.]+\.)/, "");
+      return S.document().schemaType(typeName).documentId(publishedId);
+    });
+}
 
 /** Shows an action in the document header's "⋯" menu as well as the footer menu by Publish. */
 function alsoInHeaderMenu(Action: DocumentActionComponent): DocumentActionComponent {
