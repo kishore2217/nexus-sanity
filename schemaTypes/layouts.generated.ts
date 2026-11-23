@@ -213,6 +213,214 @@ export const pageTypes = [
     ]
   },
   {
+    "name": "page_link_7367ed",
+    "title": "Link",
+    "type": "document",
+    "fields": [
+      {
+        "name": "title",
+        "title": "Title",
+        "type": "string",
+        "readOnly": true
+      },
+      {
+        "name": "slug",
+        "title": "Page URL",
+        "type": "slug",
+        "readOnly": true
+      },
+      {
+        "name": "newPageLayout1",
+        "title": "New page layout1 (v2)",
+        "type": "object",
+        "options": {
+          "collapsible": true,
+          "collapsed": false
+        },
+        "fields": [
+          {
+            "name": "allType",
+            "title": "All Type",
+            "type": "object",
+            "options": {
+              "collapsible": true,
+              "collapsed": false
+            },
+            "fields": [
+              {
+                "name": "title",
+                "title": "Title",
+                "type": "string"
+              },
+              {
+                "name": "price",
+                "title": "Price",
+                "type": "number"
+              },
+              {
+                "name": "description",
+                "title": "Description",
+                "type": "text"
+              },
+              {
+                "name": "category",
+                "title": "Category",
+                "type": "string",
+                "options": {
+                  "list": [
+                    {
+                      "title": "Electronics",
+                      "value": "electronics"
+                    },
+                    {
+                      "title": "Fashion",
+                      "value": "fashion"
+                    },
+                    {
+                      "title": "Home",
+                      "value": "home"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "status",
+                "title": "Status",
+                "type": "string",
+                "options": {
+                  "list": [
+                    {
+                      "title": "Active",
+                      "value": "active"
+                    },
+                    {
+                      "title": "Inactive",
+                      "value": "inactive"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "featured",
+                "title": "Featured Product",
+                "type": "boolean"
+              },
+              {
+                "name": "published",
+                "title": "Published",
+                "type": "boolean"
+              },
+              {
+                "name": "publishDate",
+                "title": "Publish Date",
+                "type": "date"
+              },
+              {
+                "name": "website",
+                "title": "Website",
+                "type": "url"
+              },
+              {
+                "name": "image",
+                "title": "Product Image",
+                "type": "image"
+              }
+            ]
+          },
+          {
+            "name": "allType2",
+            "title": "All Type 2",
+            "type": "object",
+            "options": {
+              "collapsible": true,
+              "collapsed": false
+            },
+            "fields": [
+              {
+                "name": "title",
+                "title": "Title",
+                "type": "string"
+              },
+              {
+                "name": "price",
+                "title": "Price",
+                "type": "number"
+              },
+              {
+                "name": "description",
+                "title": "Description",
+                "type": "text"
+              },
+              {
+                "name": "category",
+                "title": "Category",
+                "type": "string",
+                "options": {
+                  "list": [
+                    {
+                      "title": "Electronics",
+                      "value": "electronics"
+                    },
+                    {
+                      "title": "Fashion",
+                      "value": "fashion"
+                    },
+                    {
+                      "title": "Home",
+                      "value": "home"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "status",
+                "title": "Status",
+                "type": "string",
+                "options": {
+                  "list": [
+                    {
+                      "title": "Active",
+                      "value": "active"
+                    },
+                    {
+                      "title": "Inactive",
+                      "value": "inactive"
+                    }
+                  ]
+                }
+              },
+              {
+                "name": "featured",
+                "title": "Featured Product",
+                "type": "boolean"
+              },
+              {
+                "name": "published",
+                "title": "Published",
+                "type": "boolean"
+              },
+              {
+                "name": "publishDate",
+                "title": "Publish Date",
+                "type": "date"
+              },
+              {
+                "name": "website",
+                "title": "Website",
+                "type": "url"
+              },
+              {
+                "name": "image",
+                "title": "Product Image",
+                "type": "image"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  {
     "name": "page_homea_34db54",
     "title": "homea",
     "type": "document",
@@ -629,3 +837,11 @@ export const pageTypes = [
     ]
   }
 ] as SchemaTypeDefinition[]
+
+/** Per page type: its layout and widgets, shown under the page in document lists. */
+export const pageSubtitles: Record<string, string> = {
+  "page_blog_da4e69": "New page layout1 (v2) · All Type, All Type 2",
+  "page_link_7367ed": "New page layout1 (v2) · All Type, All Type 2",
+  "page_homea_34db54": "New page layout1 (v2) · All Type, All Type 2",
+  "page_services_246876": "New page layout1 (v2) · All Type, All Type 2"
+}
