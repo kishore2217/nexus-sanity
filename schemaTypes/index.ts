@@ -1,19 +1,9 @@
 import type { SchemaTypeDefinition } from "sanity";
 import { docTypes, layoutTypes, pageSubtitles, pageTypes } from "./layouts.generated";
+import { createdLabel, subtitle } from "./preview";
+import { STUDIO_PAGE_TYPE, studioPageTypes } from "./studioPage";
 
-export { docTypes };
-
-/** "24 Nov 2026, 10:30" in the editor's locale and time zone. */
-const createdFormat = new Intl.DateTimeFormat(undefined, {dateStyle: "medium", timeStyle: "short"});
-
-function createdLabel(createdAt?: string): string | undefined {
-  return createdAt ? `Created ${createdFormat.format(new Date(createdAt))}` : undefined;
-}
-
-/** Joins the non-empty parts of a list preview's subtitle with " · ". */
-function subtitle(...parts: (string | undefined)[]): string | undefined {
-  return parts.filter(Boolean).join(" · ") || undefined;
-}
+export { docTypes, STUDIO_PAGE_TYPE };
 
 type PreviewSelection = { title?: string; createdAt?: string };
 
@@ -32,7 +22,10 @@ const layoutTypesWithPreview = layoutTypes.map(
     }) as SchemaTypeDefinition,
 );
 
-/** Page types list as "<page>" with "<layout> (vN) · <widgets> · Created <date, time>" under it. */
+/**
+ * Page types list as "<page>" with "Created <date, time> · <layout> (vN) · <widgets>" under it.
+ * The date goes first: the widget list can be long and the pane cuts the line off at its end.
+ */
 const pageTypesWithPreview = pageTypes.map(
   (type) =>
     ({
@@ -41,14 +34,15 @@ const pageTypesWithPreview = pageTypes.map(
         select: { title: "title", createdAt: "_createdAt" },
         prepare: ({ title, createdAt }: PreviewSelection) => ({
           title: title || type.title || type.name,
-          subtitle: subtitle(pageSubtitles[type.name], createdLabel(createdAt)),
+          subtitle: subtitle(createdLabel(createdAt), pageSubtitles[type.name]),
         }),
       },
     }) as SchemaTypeDefinition,
 );
 
-// One document type per Nexus layout and per Nexus page, generated before every dev, build and deploy.
-export const schemaTypes = [...layoutTypesWithPreview, ...pageTypesWithPreview];
+// One document type per Nexus layout and per Nexus page, generated before every dev, build and
+// deploy, plus the Page type editors create in this studio (see ./studioPage).
+export const schemaTypes = [...layoutTypesWithPreview, ...pageTypesWithPreview, ...studioPageTypes];
 
 /** Names of the generated layout types, for the desk structure. */
 export const layoutTypeNames = new Set(layoutTypes.map((type) => type.name));

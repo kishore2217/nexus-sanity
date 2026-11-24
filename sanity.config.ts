@@ -1,3 +1,4 @@
+import { AddIcon } from "@sanity/icons/Add";
 import { visionTool } from "@sanity/vision";
 import { defineConfig, type DocumentActionComponent } from "sanity";
 import { structureTool, type StructureBuilder } from "sanity/structure";
@@ -7,6 +8,7 @@ import {
   nexusTypeNames,
   pageTypeNames,
   schemaTypes,
+  STUDIO_PAGE_TYPE,
 } from "./schemaTypes";
 import { UpdateNoticeLayout } from "./components/UpdateNotice";
 
@@ -26,7 +28,10 @@ export default defineConfig({
         S.list()
           .title("Content")
           .items([
-            S.listItem().title("Pages").child(nexusDocumentList(S, "pages", "Pages", pageTypeNames)),
+            S.listItem().title("Pages").child(
+                // Nexus pages, plus pages created here (one shared type, see schemaTypes/studioPage).
+                nexusDocumentList(S, "pages", "Pages", pageTypeNames, STUDIO_PAGE_TYPE),
+              ),
             S.listItem()
               .title("Layouts")
               .child(nexusDocumentList(S, "layouts", "Layouts", layoutTypeNames)),
@@ -56,19 +61,41 @@ export default defineConfig({
 /**
  * One pane listing every document of the given Nexus types. Each type holds a single document
  * (a page has one layout), so listing documents instead of types gives a search bar and opens the
- * document in one click. No create button: Nexus creates these documents.
+ * document in one click. Nexus creates these documents, so they get no create button.
+ *
+ * `createType` adds documents of one studio-owned type to the list, with a "New" button for it.
  * The list updates live; the header menu sorts by title or creation time.
  */
-function nexusDocumentList(S: StructureBuilder, id: string, title: string, types: Set<string>) {
+function nexusDocumentList(
+  S: StructureBuilder,
+  id: string,
+  title: string,
+  types: Set<string>,
+  createType?: string,
+) {
+  const listed = createType ? [...types, createType] : [...types];
   return S.documentList()
     .id(id)
     .title(title)
     .apiVersion("2025-02-19")
     .filter("_type in $types")
-    .params({ types: [...types] })
+    .params({ types: listed })
     .defaultOrdering([{ field: "title", direction: "asc" }])
-    .initialValueTemplates([])
+    .initialValueTemplates(createType ? [S.initialValueTemplateItem(createType)] : [])
+    // A new document opens in this list's editor pane rather than somewhere else in the desk.
+    .canHandleIntent(
+      (intent, params) => intent === "create" && !!createType && params.type === createType,
+    )
     .menuItems([
+      ...(createType
+        ? [
+            S.menuItem()
+              .title(`New ${S.context.schema.get(createType)?.title ?? createType}`)
+              .icon(AddIcon)
+              .intent({ type: "create", params: { type: createType, template: createType } })
+              .showAsAction(true),
+          ]
+        : []),
       S.orderingMenuItem({
         title: "Sort by title",
         name: "titleAsc",
@@ -104,7 +131,14 @@ function nexusDocumentList(S: StructureBuilder, id: string, title: string, types
         `*[_id in [$id, "drafts." + $id]][0]._type`,
         { id },
       );
-      if (!type) throw new Error(`Document "${id}" not found. It may have been deleted in Nexus.`);
+      if (!type) {
+        // Not saved yet: a document just created with the "New" button. Nexus ids never land
+        // here (they start with "nexus"), so a missing one still reports as deleted.
+        if (createType && !id.startsWith("nexus")) {
+          return S.document().id("editor").schemaType(createType).documentId(id);
+        }
+        throw new Error(`Document "${id}" not found. It may have been deleted in Nexus.`);
+      }
       return S.document().id("editor").schemaType(type).documentId(id);
     });
 }
