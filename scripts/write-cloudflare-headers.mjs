@@ -31,6 +31,10 @@ const rules = [
   "  X-Content-Type-Options: nosniff",
   "  Referrer-Policy: strict-origin-when-cross-origin",
   "",
+  // Polled by the studio to spot a new deploy: never serve a stale copy.
+  "/version.json",
+  "  Cache-Control: no-store",
+  "",
   // Everything under vendor/ is content-hashed by the build.
   "/vendor/*",
   `  Cache-Control: ${IMMUTABLE}`,

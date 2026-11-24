@@ -1,5 +1,3 @@
-// @sanity/icons v5 exports each icon from its own subpath, not the package root.
-import { RefreshIcon } from "@sanity/icons/Refresh";
 import { visionTool } from "@sanity/vision";
 import { defineConfig, type DocumentActionComponent } from "sanity";
 import { structureTool, type StructureBuilder } from "sanity/structure";
@@ -10,6 +8,7 @@ import {
   pageTypeNames,
   schemaTypes,
 } from "./schemaTypes";
+import { UpdateNoticeLayout } from "./components/UpdateNotice";
 
 export default defineConfig({
   name: "default",
@@ -17,6 +16,9 @@ export default defineConfig({
 
   projectId: "vskzay3h",
   dataset: "production",
+
+  // Offers a reload once CI deploys a new build (e.g. a new page or layout type from Nexus).
+  studio: { components: { layout: UpdateNoticeLayout } },
 
   plugins: [
     structureTool({
@@ -54,8 +56,8 @@ export default defineConfig({
 /**
  * One pane listing every document of the given Nexus types. Each type holds a single document
  * (a page has one layout), so listing documents instead of types gives a search bar and opens the
- * document in one click. No create button: Nexus creates these documents. The header has a refresh
- * button and sorting by title or creation time.
+ * document in one click. No create button: Nexus creates these documents.
+ * The list updates live; the header menu sorts by title or creation time.
  */
 function nexusDocumentList(S: StructureBuilder, id: string, title: string, types: Set<string>) {
   return S.documentList()
@@ -67,12 +69,6 @@ function nexusDocumentList(S: StructureBuilder, id: string, title: string, types
     .defaultOrdering([{ field: "title", direction: "asc" }])
     .initialValueTemplates([])
     .menuItems([
-      // Reloads the studio: picks up documents and schema changes synced from Nexus since it opened.
-      S.menuItem()
-        .title("Refresh")
-        .icon(RefreshIcon)
-        .showAsAction(true)
-        .action(() => window.location.reload()),
       S.orderingMenuItem({
         title: "Sort by title",
         name: "titleAsc",

@@ -10,7 +10,7 @@
     "prebuild": "npm run generate",
     "predeploy": "npm run generate",
     "build": "sanity build",
-    "postbuild": "node scripts/write-cloudflare-headers.mjs",
+    "postbuild": "node scripts/write-build-version.mjs && node scripts/write-cloudflare-headers.mjs",
     "deploy": "sanity deploy",
     "deploy-graphql": "sanity graphql deploy",
     "dev": "sanity dev",
@@ -20,7 +20,7 @@
     "sanity"
   ],
   "dependencies": {
-    "@sanity/icons": "^5.4.0",
+    "@sanity/ui": "^4.4.12",
     "@sanity/vision": "^6.24.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
