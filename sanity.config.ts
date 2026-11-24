@@ -1,4 +1,5 @@
-import { SyncIcon } from "@sanity/icons";
+// @sanity/icons v5 exports each icon from its own subpath, not the package root.
+import { RefreshIcon } from "@sanity/icons/Refresh";
 import { visionTool } from "@sanity/vision";
 import { defineConfig, type DocumentActionComponent } from "sanity";
 import { structureTool, type StructureBuilder } from "sanity/structure";
@@ -69,7 +70,7 @@ function nexusDocumentList(S: StructureBuilder, id: string, title: string, types
       // Reloads the studio: picks up documents and schema changes synced from Nexus since it opened.
       S.menuItem()
         .title("Refresh")
-        .icon(SyncIcon)
+        .icon(RefreshIcon)
         .showAsAction(true)
         .action(() => window.location.reload()),
       S.orderingMenuItem({
