@@ -1,5 +1,6 @@
 import { DocumentIcon } from "@sanity/icons/Document";
 import { defineArrayMember, defineField, defineType, type SchemaTypeDefinition } from "sanity";
+import { LayoutPickerInput } from "../components/LayoutPicker";
 import { layoutTypes } from "./layouts.generated";
 import { createdLabel, subtitle } from "./preview";
 
@@ -57,16 +58,19 @@ const studioPage = defineType({
       options: { source: "title", maxLength: 96 },
       validation: (rule) => rule.required(),
     }),
-    // An array of at most one item: Sanity's way to let editors pick one of several object types.
-    // Picking another layout means removing this one first, which makes the content loss explicit.
+    // An array of at most one item: Sanity's way to hold one of several object types. Layouts are
+    // attached through LayoutPickerInput, which asks whether to copy the layout's existing content
+    // (from the Layouts list) or start empty, so the array's own add actions are turned off.
     ...(layoutContentTypes.length > 0
       ? [
           defineField({
             name: "layout",
             title: "Layout",
-            description: "The layout this page uses. Add one, then fill in its widgets.",
+            description: "The layout this page uses. Attach one, then fill in its widgets.",
             type: "array",
             of: layoutContentTypes.map((type) => defineArrayMember({ type: type.name })),
+            options: { disableActions: ["add", "addBefore", "addAfter", "duplicate", "copy"] },
+            components: { input: LayoutPickerInput },
             validation: (rule) => rule.required().min(1).max(1).error("Attach exactly one layout"),
           }),
         ]
