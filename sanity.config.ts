@@ -1,3 +1,4 @@
+import { SyncIcon } from "@sanity/icons";
 import { visionTool } from "@sanity/vision";
 import { defineConfig, type DocumentActionComponent } from "sanity";
 import { structureTool, type StructureBuilder } from "sanity/structure";
@@ -52,7 +53,8 @@ export default defineConfig({
 /**
  * One pane listing every document of the given Nexus types. Each type holds a single document
  * (a page has one layout), so listing documents instead of types gives a search bar and opens the
- * document in one click. No create button: Nexus creates these documents.
+ * document in one click. No create button: Nexus creates these documents. The header has a refresh
+ * button and sorting by title or creation time.
  */
 function nexusDocumentList(S: StructureBuilder, id: string, title: string, types: Set<string>) {
   return S.documentList()
@@ -63,7 +65,29 @@ function nexusDocumentList(S: StructureBuilder, id: string, title: string, types
     .params({ types: [...types] })
     .defaultOrdering([{ field: "title", direction: "asc" }])
     .initialValueTemplates([])
-    .menuItems([])
+    .menuItems([
+      // Reloads the studio: picks up documents and schema changes synced from Nexus since it opened.
+      S.menuItem()
+        .title("Refresh")
+        .icon(SyncIcon)
+        .showAsAction(true)
+        .action(() => window.location.reload()),
+      S.orderingMenuItem({
+        title: "Sort by title",
+        name: "titleAsc",
+        by: [{ field: "title", direction: "asc" }],
+      }),
+      S.orderingMenuItem({
+        title: "Sort by created (newest first)",
+        name: "createdDesc",
+        by: [{ field: "_createdAt", direction: "desc" }],
+      }),
+      S.orderingMenuItem({
+        title: "Sort by created (oldest first)",
+        name: "createdAsc",
+        by: [{ field: "_createdAt", direction: "asc" }],
+      }),
+    ])
     .child(async (id) => {
       // Known at build time: open the document without a round trip to Sanity.
       const known = docTypes[id];
