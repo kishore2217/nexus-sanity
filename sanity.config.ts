@@ -1,4 +1,5 @@
 import { AddIcon } from "@sanity/icons/Add";
+import { TrashIcon } from "@sanity/icons/Trash";
 import { visionTool } from "@sanity/vision";
 import { defineConfig, type DocumentActionComponent } from "sanity";
 import { structureTool, type StructureBuilder } from "sanity/structure";
@@ -10,7 +11,8 @@ import {
   schemaTypes,
   STUDIO_PAGE_TYPE,
 } from "./schemaTypes";
-import { UpdateNoticeLayout } from "./components/UpdateNotice";
+import { openBulkDelete } from "./components/BulkDelete";
+import { StudioLayout } from "./components/StudioLayout";
 
 export default defineConfig({
   name: "default",
@@ -19,8 +21,9 @@ export default defineConfig({
   projectId: "vskzay3h",
   dataset: "production",
 
-  // Offers a reload once CI deploys a new build (e.g. a new page or layout type from Nexus).
-  studio: { components: { layout: UpdateNoticeLayout } },
+  // Offers a reload once CI deploys a new build (e.g. a new page or layout type from Nexus), and
+  // hosts the lists' "Select & delete" dialog.
+  studio: { components: { layout: StudioLayout } },
 
   plugins: [
     structureTool({
@@ -96,6 +99,11 @@ function nexusDocumentList(
               .showAsAction(true),
           ]
         : []),
+      // Lists select one document at a time; this opens a dialog with checkboxes.
+      S.menuItem()
+        .title("Select & delete…")
+        .icon(TrashIcon)
+        .action(() => openBulkDelete({ title, types: listed })),
       S.orderingMenuItem({
         title: "Sort by title",
         name: "titleAsc",
