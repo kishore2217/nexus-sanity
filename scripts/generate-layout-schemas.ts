@@ -17,13 +17,29 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { getCliClient } from "sanity/cli";
 
+/** A field as the Nexus sync stores it (`SanityField` in Nexus `cms/sanity/schema.ts`). */
 type StoredField = {
   name: string;
   type: string;
   title?: string;
-  options?: { list?: { title: string; value: string }[] };
+  description?: string;
+  placeholder?: string;
+  rows?: number;
+  readOnly?: boolean;
+  hidden?: boolean;
+  deprecated?: { reason: string };
+  initialValue?: unknown;
+  options?: Record<string, unknown>;
+  /** object: its fields. */
+  fields?: StoredField[];
+  /** array: what it holds. */
+  of?: StoredArrayMember[];
+  /** reference: allowed document types. */
+  to?: { type: string }[];
+  weak?: boolean;
   nexusJson?: boolean;
 };
+type StoredArrayMember = { type: string; name?: string; title?: string; fields?: StoredField[] };
 type StoredWidget = { fieldName: string; title?: string; fields?: StoredField[] };
 type StoredLayout = { layoutId?: string; typeName: string; title?: string; widgets?: StoredWidget[] };
 type StoredPageLayout = {
@@ -42,10 +58,19 @@ type StoredPage = {
 const OUTPUT = resolve(process.cwd(), "schemaTypes/layouts.generated.ts");
 const JSON_ROWS = 6;
 
-/** Field types the generator can emit as-is. Anything else would break the whole Studio schema. */
-const SUPPORTED_FIELD_TYPES = new Set([
-  "string", "text", "number", "boolean", "date", "datetime", "url", "image", "file", "slug",
+/**
+ * Leaf field types the generator emits as-is. `object`, `array` and `reference` are built below.
+ * Anything else (e.g. cross-dataset references, which need Studio config) is skipped with a
+ * warning: an unknown type would break the whole Studio schema.
+ */
+const LEAF_FIELD_TYPES = new Set([
+  "string", "text", "number", "boolean", "date", "datetime", "url", "email", "image", "file",
+  "slug", "geopoint",
 ]);
+/** Field options Sanity reads from data; other stored options are dropped. */
+const FIELD_OPTION_KEYS = [
+  "list", "layout", "direction", "accept", "hotspot", "dateFormat", "timeFormat", "timeStep",
+];
 /** Sanity type and field names: a letter or underscore, then letters, digits or underscores. */
 const VALID_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
@@ -95,41 +120,105 @@ function toDocTypes(layouts: StoredLayout[], pages: StoredPage[]): Record<string
   return Object.fromEntries(entries.filter(([id]) => id));
 }
 
-function toField(field: StoredField) {
+/** Document types a reference may point at: those this Studio defines. */
+type FieldContext = { documentTypes: Set<string> };
+
+type GeneratedField = Record<string, unknown> & { name: string; type: string };
+
+function pickOptions(options: StoredField["options"]) {
+  const picked = Object.fromEntries(
+    FIELD_OPTION_KEYS.filter((key) => options?.[key] !== undefined).map((key) => [
+      key,
+      options?.[key],
+    ]),
+  );
+  return Object.keys(picked).length > 0 ? picked : undefined;
+}
+
+/** What an array field holds: strings, Portable Text blocks, or objects with their fields. */
+function toArrayMembers(field: StoredField, where: string, ctx: FieldContext) {
+  return (field.of ?? []).flatMap((member) => {
+    if (member.type === "string" || member.type === "block") return [{ type: member.type }];
+    if (member.type === "object") {
+      const fields = toFields(member.fields, `${where} › ${field.name}[]`, ctx);
+      if (fields.length === 0) return [];
+      return [{ type: "object", name: member.name || "item", title: member.title, fields }];
+    }
+    console.warn(`Skipping "${member.type}" items of "${field.name}" in ${where}`);
+    return [];
+  });
+}
+
+/**
+ * The type-specific part of a field: nested fields, array members or reference targets. Null
+ * when Sanity couldn't render it (unknown type, empty object, reference to a type this Studio
+ * doesn't define), so the field is skipped.
+ */
+function toTypeParts(field: StoredField, where: string, ctx: FieldContext) {
+  if (LEAF_FIELD_TYPES.has(field.type)) return {};
+  if (field.type === "object") {
+    const fields = toFields(field.fields, `${where} › ${field.name}`, ctx);
+    return fields.length > 0 ? { fields } : null;
+  }
+  if (field.type === "array") {
+    const of = toArrayMembers(field, where, ctx);
+    return of.length > 0 ? { of } : null;
+  }
+  if (field.type === "reference") {
+    const to = (field.to ?? []).filter((target) => ctx.documentTypes.has(target.type));
+    return to.length > 0 ? { to, ...(field.weak && { weak: true }) } : null;
+  }
+  return null;
+}
+
+function toField(field: StoredField, where: string, ctx: FieldContext): GeneratedField | null {
+  const parts = toTypeParts(field, where, ctx);
+  if (!parts) {
+    console.warn(`Skipping field "${field.name}" in ${where}: unsupported type "${field.type}"`);
+    return null;
+  }
+  const options = pickOptions(field.options);
   return {
     name: field.name,
     title: field.title ?? field.name,
     type: field.type,
-    ...(field.options?.list?.length && { options: { list: field.options.list } }),
+    ...parts,
+    ...(field.description && { description: field.description }),
+    ...(field.placeholder && { placeholder: field.placeholder }),
+    ...(field.rows && { rows: field.rows }),
+    ...(field.readOnly && { readOnly: true }),
+    ...(field.hidden && { hidden: true }),
+    ...(field.deprecated?.reason && { deprecated: { reason: field.deprecated.reason } }),
+    ...(field.initialValue !== undefined && { initialValue: field.initialValue }),
+    ...(options && { options }),
     ...(field.nexusJson && { description: "JSON", rows: JSON_ROWS }),
   };
 }
 
-/** Fields Sanity can render: a valid, unique name and a supported type. */
-function toFields(fields: StoredField[] | undefined, where: string) {
+/**
+ * Fields Sanity can render: a valid, unique name and a supported type, at any depth. Every field
+ * the Nexus sync writes content for must be here, or the Studio reports it as an unknown field.
+ */
+function toFields(fields: StoredField[] | undefined, where: string, ctx: FieldContext) {
   return validNamed(fields, (f) => f.name, `field in ${where}`)
-    .filter((field) => {
-      if (SUPPORTED_FIELD_TYPES.has(field.type)) return true;
-      console.warn(`Skipping field "${field.name}" in ${where}: unsupported type "${field.type}"`);
-      return false;
-    })
-    .map(toField);
+    .map((field) => toField(field, where, ctx))
+    .filter((field): field is GeneratedField => field !== null);
 }
 
 /** One object field per widget. An object needs a field: widgets without props are skipped. */
-function toWidgetFields(widgets: StoredWidget[] | undefined, where: string) {
+function toWidgetFields(widgets: StoredWidget[] | undefined, where: string, ctx: FieldContext) {
   return validNamed(widgets, (w) => w.fieldName, `widget in ${where}`)
     .map((widget) => ({
       name: widget.fieldName,
       title: widget.title ?? widget.fieldName,
       type: "object",
       options: { collapsible: true, collapsed: false },
-      fields: toFields(widget.fields, `${where} › ${widget.fieldName}`),
+      fields: toFields(widget.fields, `${where} › ${widget.fieldName}`, ctx),
     }))
     .filter((widget) => widget.fields.length > 0);
 }
 
-function toDocumentType(layout: StoredLayout) {
+function toDocumentType(layout: StoredLayout, ctx: FieldContext) {
   return {
     name: layout.typeName,
     title: layout.title ?? layout.typeName,
@@ -137,17 +226,17 @@ function toDocumentType(layout: StoredLayout) {
     fields: [
       { name: "title", title: "Title", type: "string", readOnly: true },
       { name: "slug", title: "Layout id", type: "slug", readOnly: true, hidden: true },
-      ...toWidgetFields(layout.widgets, layout.typeName),
+      ...toWidgetFields(layout.widgets, layout.typeName, ctx),
     ],
   };
 }
 
 /** Page → one object field per layout → one object field per widget. */
-function toPageDocumentType(page: StoredPage) {
+function toPageDocumentType(page: StoredPage, ctx: FieldContext) {
   const layouts = validNamed(page.layouts, (l) => l.fieldName, `layout in ${page.typeName}`)
     .map((layout) => ({
       layout,
-      widgets: toWidgetFields(layout.widgets, `${page.typeName} › ${layout.fieldName}`),
+      widgets: toWidgetFields(layout.widgets, `${page.typeName} › ${layout.fieldName}`, ctx),
     }))
     .filter(({ widgets }) => widgets.length > 0);
   return {
@@ -190,8 +279,11 @@ async function main() {
     console.warn(`Skipping page type: name "${page.typeName}" is already a layout type`);
     return false;
   });
-  const layoutTypes = layouts.map(toDocumentType);
-  const pageTypes = pages.map(toPageDocumentType);
+  const ctx: FieldContext = {
+    documentTypes: new Set([...layoutNames, ...pages.map((p) => p.typeName)]),
+  };
+  const layoutTypes = layouts.map((layout) => toDocumentType(layout, ctx));
+  const pageTypes = pages.map((page) => toPageDocumentType(page, ctx));
   const pageSubtitles = Object.fromEntries(pages.map((p) => [p.typeName, toPageSubtitle(p)]));
   const docTypes = toDocTypes(layouts, pages);
 

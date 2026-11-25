@@ -1,9 +1,9 @@
 name: Deploy Studio to Cloudflare Pages
 
 # Title of each run in the Actions list. A Nexus dispatch would otherwise show as its bare event
-# type ("sanity-layout-schema"); name it after what changed. Nexus may send
-# client_payload.reason (e.g. "Page \"Blog\" updated") to say exactly what; otherwise a generic
-# title covers both layouts and pages. Pushes keep the commit message, manual runs say so.
+# type ("sanity-layout-schema"); name it after what changed. The webhook sends
+# client_payload.reason (e.g. "1 layout and 2 pages exported") to say exactly what; otherwise a
+# generic title covers both layouts and pages. Pushes keep the commit message, manual runs say so.
 run-name: >-
   ${{ github.event_name == 'repository_dispatch'
       && format('Nexus sync: {0}', github.event.client_payload.reason || 'layouts & pages updated')
@@ -16,10 +16,11 @@ on:
     # Docs-only changes don't change the studio.
     paths-ignore: ["**.md"]
   workflow_dispatch:
-  # Fired by the Nexus sync after a layout or page is submitted, so the studio rebuilds with the
-  # new schema:
+  # Fired once per Nexus export that changed a schema, so the studio rebuilds with it. A Sanity
+  # webhook filtered on `_type == "nexusExportRun"` (one document Nexus rewrites at the end of each
+  # export) sends it; a webhook on the layout/page documents would fire once per document written.
   # POST /repos/kishore2217/nexus-sanity/dispatches
-  #   {"event_type": "sanity-layout-schema", "client_payload": {"reason": "Layout \"Home\" updated"}}
+  #   {"event_type": "sanity-layout-schema", "client_payload": {"reason": "1 layout exported"}}
   repository_dispatch:
     types: [sanity-layout-schema]
 
