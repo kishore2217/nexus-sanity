@@ -1,4 +1,6 @@
 import { AddIcon } from "@sanity/icons/Add";
+import { EditIcon } from "@sanity/icons/Edit";
+import { EyeOpenIcon } from "@sanity/icons/EyeOpen";
 import { TrashIcon } from "@sanity/icons/Trash";
 import { visionTool } from "@sanity/vision";
 import { defineConfig, type DocumentActionComponent } from "sanity";
@@ -12,6 +14,7 @@ import {
   STUDIO_PAGE_TYPE,
 } from "./schemaTypes";
 import { openBulkDelete } from "./components/BulkDelete";
+import { DocumentPreview } from "./components/DocumentPreview";
 import { StudioLayout } from "./components/StudioLayout";
 
 export default defineConfig({
@@ -123,14 +126,14 @@ function nexusDocumentList(
     .child(async (id) => {
       // Known at build time: open the document without a round trip to Sanity.
       const known = docTypes[id];
-      if (known) return S.document().id("editor").schemaType(known).documentId(id);
+      if (known) return editor(S).schemaType(known).documentId(id);
       const client = S.context.getClient({ apiVersion: "2025-02-19" });
       // Older URLs (and links built from them) put the type name where the document id goes:
       // /structure/pages/page_blog_da4e69. Each type holds one document, so open that one.
       if (types.has(id)) {
         const docId = await client.fetch<string | null>(`*[_type == $type][0]._id`, { type: id });
         return docId
-          ? S.document().id("editor").schemaType(id).documentId(docId.replace(/^drafts\./, ""))
+          ? editor(S).schemaType(id).documentId(docId.replace(/^drafts\./, ""))
           : S.documentTypeList(id);
       }
       // Synced after this build: look its type up. With several types in one list, the editor
@@ -143,12 +146,22 @@ function nexusDocumentList(
         // Not saved yet: a document just created with the "New" button. Nexus ids never land
         // here (they start with "nexus"), so a missing one still reports as deleted.
         if (createType && !id.startsWith("nexus")) {
-          return S.document().id("editor").schemaType(createType).documentId(id);
+          return editor(S).schemaType(createType).documentId(id);
         }
         throw new Error(`Document "${id}" not found. It may have been deleted in Nexus.`);
       }
-      return S.document().id("editor").schemaType(type).documentId(id);
+      return editor(S).schemaType(type).documentId(id);
     });
+}
+
+/** A page or layout editor: the form, plus a Preview tab showing its widgets with their content. */
+function editor(S: StructureBuilder) {
+  return S.document()
+    .id("editor")
+    .views([
+      S.view.form().icon(EditIcon),
+      S.view.component(DocumentPreview).id("preview").title("Preview").icon(EyeOpenIcon),
+    ]);
 }
 
 /** Shows an action in the document header's "⋯" menu as well as the footer menu by Publish. */
